@@ -79,8 +79,6 @@ async function getMedia(deviceId) {
       cameraOff = true;
     }
   }
-
-
 //list형태로 메세지가 쌓이도록
 function addMessage(message,sender){
 
@@ -116,7 +114,7 @@ async function initCall(){
     await getMedia();
     makeConnection();
 }
-//방 입장
+//방 입장했을 때 (roomName을 보여주고 send 이벤트 리스너)
 async function showRoom(){        
     const h3 = room.querySelector("h3");
     h3.innerText = `Room ${roomName}`;
@@ -124,7 +122,7 @@ async function showRoom(){
     msgForm.addEventListener("submit",handleMessageSubmit);
 }
 
-//방 입장
+//방 입장 (room,nickname,showRoom함수 전달)
 async function handleRoomSubmit(event){
     event.preventDefault();
     const room = welcome.querySelector("#roomname");
@@ -135,73 +133,12 @@ async function handleRoomSubmit(event){
     room.value="";
 }
 
-//닉네임과 방 이름 작성 후 접속버튼을 눌렀을 때 발생하는 이벤트리스너
-form.addEventListener("submit", handleRoomSubmit);
-
-//새로운 메시지를 작성하여 send버튼을 눌렀을 때 (new_message 이벤트 발생했을 때) addMessage함수 실행
-socket.on("new_message", addMessage);
-
-//room_change 이벤트 발생 시 roomlist가 비어있으면 비어있는 값 return, 아닐 시 리스트 형태로 방 추가
-socket.on("room_change", (rooms) => {
-    const roomList = welcome.querySelector("ul");
-    roomList.innerHTML = "";
-    if(rooms.length === 0){
-        roomList.innerHTML = "";
-        return;
-    }
-    rooms.forEach(room => {
-        const li = document.createElement("li");
-        li.innerText = room;
-        roomList.appendChild(li);
-    });
-});
-
-//Offer생성 => 다른 브라우저가 참가할수 있도록 하는 초대장 역할(누구이며 어디에 있는지)
-async function CreateOffer(){
-    const offer = await myPeerConnection.createOffer();
-    myPeerConnection.setLocalDescription(offer);
-    console.log(offer);
-    socket.emit("offer", offer, roomName);
-}
-socket.on("offer", async (offer) => {
-    console.log("receive offer");
-    myPeerConnection.setRemoteDescription(offer);
-    const answer = await myPeerConnection.createAnswer();
-    console.log(answer);
-    myPeerConnection.setLocalDescription(answer);
-    socket.emit("answer",answer,roomName);
-    console.log("sent answer");
-})
-socket.on("answer",(answer) => {
-    myPeerConnection.setRemoteDescription(answer);
-    console.log("receive answer");
-})
-//입장
-socket.on("welcome", (user, newCount) => {
-    CreateOffer();
-    console.log("sent offer");
-    const h3 = room.querySelector("h3");    
-    h3.innerText = `Room ${roomName} (${newCount})`;
-    addMessage(`${user} joined!`);
-});
-
-//퇴장
-socket.on("bye", (left, newCount) => {
-    const h3 = room.querySelector("h3");
-    h3.innerText = `Room ${roomName} (${newCount})`;
-    addMessage(`${left} left ㅠㅠ`);
-});
-
 function makeConnection(){
     myPeerConnection = new RTCPeerConnection();
     myPeerConnection.addEventListener("icecandidate",handleIce);
     myPeerConnection.addEventListener("addstream",handleAddstream);
     myStream.getTracks().forEach((track) => myPeerConnection.addTrack(track,myStream));
 }
-socket.on("ice",(ice,roomName) => {
-    console.log("Received candi");
-    myPeerConnection.addIceCandidate(ice);
-});
 function handleIce(data){
     socket.emit("ice", data.candidate,roomName);
     console.log("sent candi");
@@ -223,3 +160,67 @@ async function handleCameraChange(){
 muteBtn.addEventListener("click", handleMuteClick);
 cameraBtn.addEventListener("click", handleCameraClick);
 camerasSelect.addEventListener("input",handleCameraChange);
+//닉네임과 방 이름 작성 후 접속버튼을 눌렀을 때 발생하는 이벤트리스너
+form.addEventListener("submit", handleRoomSubmit);
+
+//새로운 메시지를 작성하여 send버튼을 눌렀을 때 (new_message 이벤트 발생했을 때) addMessage함수 실행
+socket.on("new_message", addMessage);
+
+//room_change 이벤트 발생 시 roomlist가 비어있으면 비어있는 값 return, 아닐 시 리스트 형태로 방 추가
+socket.on("room_change", (rooms) => {
+    const roomList = welcome.querySelector("ul");
+    roomList.innerHTML = "";
+    if(rooms.length === 0){
+        roomList.innerHTML = "";
+        return;
+    }
+    rooms.forEach(room => {
+        const li = document.createElement("li");
+        li.innerText = room;
+        roomList.appendChild(li);
+    });
+});
+socket.on("ice",(ice,roomName) => {
+    console.log("Received candi");
+    myPeerConnection.addIceCandidate(ice);
+});
+
+
+//입장
+socket.on("welcome", (user, newCount) => {
+    CreateOffer();
+    console.log("sent offer");
+    const h3 = room.querySelector("h3");    
+    h3.innerText = `Room ${roomName} (${newCount})`;
+    addMessage(`${user} joined!`);
+});
+
+//퇴장
+socket.on("bye", (left, newCount) => {
+    const h3 = room.querySelector("h3");
+    h3.innerText = `Room ${roomName} (${newCount})`;
+    addMessage(`${left} left ㅠㅠ`);
+});
+
+//RTC Code
+
+//Offer생성 => 다른 브라우저가 참가할수 있도록 하는 초대장 역할(누구이며 어디에 있는지)
+async function CreateOffer(){
+    const offer = await myPeerConnection.createOffer();
+    myPeerConnection.setLocalDescription(offer);
+    console.log(offer);
+    socket.emit("offer", offer, roomName);
+}
+socket.on("offer", async (offer) => {
+    console.log("receive offer");
+    myPeerConnection.setRemoteDescription(offer);
+    const answer = await myPeerConnection.createAnswer();
+    console.log(answer);
+    myPeerConnection.setLocalDescription(answer);
+    socket.emit("answer",answer,roomName);
+    console.log("sent answer");
+})
+socket.on("answer",(answer) => {
+    myPeerConnection.setRemoteDescription(answer);
+    console.log("receive answer");
+})
